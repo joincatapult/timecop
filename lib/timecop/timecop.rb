@@ -117,24 +117,7 @@ class Timecop
     end
 
     def thread_safe?
-      global_thread_safe? || local_thread_safe?
-    end
-
-    def local_thread_safe?
-      !!Thread.current[:__timecop_thread_safe]
-    end
-
-    def global_thread_safe=(safe)
-      self.class_variable_get(:@@mutex).synchronize do
-        @global_thread_safe = !!safe
-      end
-    end
-
-    def global_thread_safe?
-      self.class_variable_get(:@@mutex).synchronize do
-        @global_thread_safe = false unless defined?(@global_thread_safe)
-        @global_thread_safe
-      end
+      Thread.current[:__timecop_thread_safe].nil? ? true : Thread.current[:__timecop_thread_safe]
     end
 
     def singleton_instance
