@@ -11,9 +11,9 @@ require File.join(File.dirname(__FILE__), "time_stack_item")
 # anything that might expire).  This will allow us to alter the return value of
 # Date.today, Time.now, and DateTime.now, such that our application code _never_ has to change.
 class Timecop
-  include Singleton
-
+  @@mutex = Mutex.new
   class << self
+
     # Allows you to run a block of code and "fake" a time throughout the execution of that block.
     # This is particularly useful for writing test methods where the passage of time is critical to the business
     # logic being tested.  For example:
@@ -100,20 +100,64 @@ class Timecop
     end
 
     def top_stack_item #:nodoc:
-      instance.instance_variable_get(:@_stack).last
+      instance.send(:stack).last
     end
 
     def safe_mode=(safe)
-      @safe_mode = safe
+      @safe_mode = !!safe
     end
 
     def safe_mode?
-      @safe_mode ||= false
+      @safe_mode = false unless defined?(@safe_mode)
+      @safe_mode
+    end
+
+    def thread_safe=(safe)
+      Thread.current[:__timecop_thread_safe] = safe
+    end
+
+    def thread_safe?
+      global_thread_safe? || local_thread_safe?
+    end
+
+    def local_thread_safe?
+      !!Thread.current[:__timecop_thread_safe]
+    end
+
+    def global_thread_safe=(safe)
+      self.class_variable_get(:@@mutex).synchronize do
+        @global_thread_safe = !!safe
+      end
+    end
+
+    def global_thread_safe?
+      self.class_variable_get(:@@mutex).synchronize do
+        @global_thread_safe = false unless defined?(@global_thread_safe)
+        @global_thread_safe
+      end
+    end
+
+    def singleton_instance
+      self.class_variable_get(:@@mutex).synchronize do
+        @singleton_instance ||= new
+      end
+    end
+
+    def instance
+      if thread_safe?
+        obj = Thread.current[:__timecop_instance]
+        return obj if obj
+        obj = new
+        Thread.current[:__timecop_instance] = obj
+        obj
+      else
+        singleton_instance
+      end
     end
 
     # Returns whether or not Timecop is currently frozen/travelled
     def frozen?
-      !instance.instance_variable_get(:@_stack).empty?
+      !instance.send(:stack).empty?
     end
 
     private
@@ -125,9 +169,15 @@ class Timecop
 
   private
 
+  def stack
+    @_stack
+  end
+
   def baseline=(baseline)
     @baseline = baseline
-    @_stack << TimeStackItem.new(:travel, baseline)
+    @@mutex.synchronize do
+      @_stack << TimeStackItem.new(:travel, baseline)
+    end
   end
 
   def initialize #:nodoc:
@@ -139,36 +189,51 @@ class Timecop
 
     stack_item = TimeStackItem.new(mock_type, *args)
 
-    stack_backup = @_stack.dup
-    @_stack << stack_item
+    stack_backup = nil
+    @@mutex.synchronize do
+      stack_backup = @_stack.dup
+      @_stack << stack_item
+    end
 
     if block_given?
       begin
         yield stack_item.time
       ensure
-        @_stack.replace stack_backup
+        @@mutex.synchronize do
+          @_stack.replace stack_backup
+        end
       end
     end
   end
 
   def return(&block)
-    current_stack = @_stack
-    current_baseline = @baseline
+    current_stack = []
+    current_baseline = nil
+    @@mutex.synchronize do
+      current_stack = @_stack
+      current_baseline = @baseline
+    end
     unmock!
     yield
   ensure
-    @_stack = current_stack
-    @baseline = current_baseline
+    @@mutex.synchronize do
+      @_stack = current_stack
+      @baseline = current_baseline
+    end
   end
 
   def unmock! #:nodoc:
-    @baseline = nil
-    @_stack = []
+    @@mutex.synchronize do
+      @baseline = nil
+      @_stack = []
+    end
   end
 
   def return_to_baseline
     if @baseline
-      @_stack = [@_stack.shift]
+      @@mutex.synchronize do
+        @_stack = [@_stack.shift]
+      end
     else
       unmock!
     end
