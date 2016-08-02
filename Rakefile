@@ -1,5 +1,5 @@
 require 'bundler/setup'
-require 'bundler/gem_tasks'
+require 'private_gem/tasks'
 require 'rake/testtask'
 require 'rdoc/task'
 

@@ -6,7 +6,7 @@
 require File.expand_path('../lib/timecop/version', __FILE__)
 
 Gem::Specification.new do |s|
-  s.name = %q{timecop}
+  s.name = %q{timecop-threadsafe}
   s.version = Timecop::VERSION
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.required_ruby_version = Gem::Requirement.new(">= 1.9.2")
@@ -27,7 +27,6 @@ Gem::Specification.new do |s|
      "lib/timecop/time_stack_item.rb",
      "lib/timecop/version.rb",
      "lib/timecop/timecop.rb",
-     "test/run_tests.sh",
      "test/test_helper.rb",
      "test/time_stack_item_test.rb",
      "test/timecop_test.rb",
@@ -40,6 +39,7 @@ Gem::Specification.new do |s|
   s.rubyforge_project = %q{timecop}
   s.rubygems_version = %q{1.3.7}
   s.summary = %q{A gem providing "time travel" and "time freezing" capabilities, making it dead simple to test time-dependent code.  It provides a unified method to mock Time.now, Date.today, and DateTime.now in a single call.}
+  s.metadata['allowed_push_host'] = "https://gem.zdsys.com/gems/"
   s.license = "MIT"
   s.test_files = [
     "test/test_helper.rb",
